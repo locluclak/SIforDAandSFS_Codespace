@@ -3,12 +3,11 @@ import multiprocessing as mpr
 import scipy 
 import numpy as np
 import matplotlib.pyplot as plt
-import SIwithHomotopy
 import os
 def main(st = 0):
-    max_iteration = 8000
+    max_iteration = 50000
     list_p_value = []
-    ssize = 50
+    ssize = 40
     alpha = 0.05
     count = 0
     #print("core available: ", mpr.cpu_count())

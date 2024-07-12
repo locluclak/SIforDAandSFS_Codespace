@@ -210,14 +210,18 @@ def run(num_samples, iterr = 0):
     SELECTION_F,r = FS.fixedSelection(np.dot(gamma, YsYt), Xtilde, 2)
 
     # X_M = Xtilde[:, sorted([x for x in range(p) if x not in SELECTION_F])].copy()
-    X_M = Xtilde[:, sorted(SELECTION_F)].copy()
+    X_M = Xt[:, sorted(SELECTION_F)].copy()
+
+    # Zeta cut off source data in Y
+    Zeta = np.concatenate((np.zeros((nt, ns)), np.identity(nt)), axis = 1)
 
     # Compute eta
     jtest = np.random.choice(range(len(SELECTION_F)))
     e = np.zeros((len(SELECTION_F), 1))
     e[jtest][0] = 1
 
-    eta = np.dot(e.T , np.dot(np.linalg.inv(np.dot(X_M.T, X_M)), X_M.T)) 
+    eta = np.dot(e.T , np.dot(np.dot(np.linalg.inv(np.dot(X_M.T, X_M)), X_M.T), Zeta)) 
+
 
     XtildeA= Xtilde.copy()
     
@@ -256,5 +260,5 @@ def run(num_samples, iterr = 0):
     return selective_p_value
 
 if __name__ == "__main__":
-    for i in range(10):
-        print(run(100,0)) 
+    for i in range(100):
+        print(run(50,0)) 
