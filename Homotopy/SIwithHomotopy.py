@@ -8,6 +8,7 @@ import time
 from mpmath import mp
 mp.dps = 500
 
+
 def DA_Wasser(ns, nt, X_):
     OMEGA = Wasser.createOMEGA(ns,nt).copy()
 
@@ -224,8 +225,12 @@ def unionPoly(listofpoly, Vm, Vp):
     return ls
 
 def run(num_samples, iter = 0):
-    true_beta1 = np.array([0, 0, 0, 0]) #source's beta
-    true_beta2 = np.array([0, 0, 0, 0]) #target's beta
+    # seed = 1766579821
+    seed = int(np.random.rand() * (2**32 - 1))
+    np.random.seed(seed)
+
+    true_beta1 = np.array([0, 0]) #source's beta
+    true_beta2 = np.array([0, 0]) #target's beta
     # print(num_samples)
     # number of sample
     ns = int(num_samples * 0.8) # source ~ 80%
@@ -260,16 +265,19 @@ def run(num_samples, iter = 0):
     Ytilde = np.dot(GAMMA, Y)
 
     # Select 2 best features of model
-    SELECTION_F,r = FS.fixedSelection(Ytilde, Xtilde, 2)
+    SELECTION_F,r = FS.fixedSelection(Ytilde, Xtilde, 1)
 
-    X_M = Xtilde[:, SELECTION_F].copy()
+    X_M = Xt[:, sorted(SELECTION_F)].copy()
 
     # Compute eta
     jtest = np.random.choice(range(len(SELECTION_F)))
     e = np.zeros((len(SELECTION_F), 1))
     e[jtest][0] = 1
 
-    eta = np.dot(e.T , np.dot(np.linalg.inv(np.dot(X_M.T, X_M)), X_M.T)) 
+    # Zeta cut off source data in Y
+    Zeta = np.concatenate((np.zeros((nt, ns)), np.identity(nt)), axis = 1)
+
+    eta = np.dot(e.T , np.dot(np.dot(np.linalg.inv(np.dot(X_M.T, X_M)), X_M.T), Zeta)) 
     eta = eta.reshape((-1,1))
     etaT_Sigma_eta = np.dot(np.dot(eta.T , Sigma_) , eta).item()
     
@@ -289,11 +297,18 @@ def run(num_samples, iter = 0):
     # Vplus = min(Vplus12, Vplus3)
     u_poly = []
     
-    zrange = tuple(x*0.02 for x in range(-20*50, 20*50+1)) # [-20, 20, step = 0.04]
-
-    for t in range(1,len(zrange)):
-        Ydeltaz = a + b* z[t]
-        XsXt_deltaz = np.concatenate((X, Ydeltaz), axis= 1)
+    # zrange = tuple(x*0.02 for x in range(-20*50, 20*50+1)) # [-20, 20, step = 0.04]
+    z = -10
+    zmax = 10
+    while z <= zmax:
+        # print(z)
+        z += 0.002
+        Ydeltaz = a + b*z
+        # if abs(z) >= 10:
+        #     z+= 0.5
+        # else:
+        # print(z)
+        XsXt_deltaz = np.concatenate((X, Ydeltaz), axis= 1).copy()
         GAMMAdeltaz = DA_Wasser(ns, nt, XsXt_deltaz)
 
         # Bunch of Xs Xt after transforming
@@ -301,7 +316,7 @@ def run(num_samples, iter = 0):
         Ytildeinloop = np.dot(GAMMAdeltaz, Y)
 
         # Select 2 best features of model
-        SELECTION_Finloop, r = FS.fixedSelection(Ytildeinloop, Xtildeinloop, 2)
+        SELECTION_Finloop, r = FS.fixedSelection(Ytildeinloop, Xtildeinloop, 1)
         if SELECTION_F != SELECTION_Finloop:
             continue
 
@@ -314,18 +329,25 @@ def run(num_samples, iter = 0):
         Vp_ = min(Vplus12, Vplus3)
         if Vm_ > Vp_:
             continue
-            # print(f"ERROR {Vm_}, {Vp_}")
+            print(f"ERROR {Vm_}, {Vp_}")
+
+        # print("Detected")
         u_poly = unionPoly(u_poly, Vm_, Vp_)
+        # print(z)
+        if z < u_poly[-1][1]:
+            z = u_poly[-1][1]
+            # print(f"-{z}--")
+
     
     
     
     # Arena of truncate PDF
     denominator = 0
     numerator = None
-    #print(f"etay: {etaT_Y}")
-    #for poly in u_poly:
-    #    print(f"({np.round(poly[0], 5)}, {np.round(poly[1], 5)})", end=', ')
-    #print()
+    # print(f"etay: {etaT_Y}")
+    # for poly in u_poly:
+    #   print(f"({np.round(poly[0], 5)}, {np.round(poly[1], 5)})", end=', ')
+    # print()
     for poly in u_poly:
         leftside, rightside = poly
         if leftside <= etaT_Y <= rightside:
@@ -339,15 +361,14 @@ def run(num_samples, iter = 0):
     # denominator = mp.ncdf(Vplus / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(Vminus / np.sqrt(etaT_Sigma_eta))
     cdf = float(numerator / denominator)
 
+    print("Seed: ",seed)
+
     # compute two-sided selective p_value
     selective_p_value = 2 * min(cdf, 1 - cdf)
     return selective_p_value
 if __name__ == "__main__":
-    for i in range(50):
+    for i in range(15):
         st = time.time()
         print(run(35, 0))
         en = time.time()
         print(f"Time step {i}: {en - st}")
-#     etay: 0.226900952409829
-# [(0.12722, 0.16836), (0.1809, 0.24579), (0.2668, 0.33015), (0.33391, 0.33888), (1.46407, 1.65169), (1.66431, 1.88059), (1.90291, 1.982)]
-# 0.869396016482189
