@@ -225,7 +225,7 @@ def unionPoly(listofpoly, Vm, Vp):
     return ls
 
 def run(num_samples, iter = 0):
-    # seed = 1766579821
+    # seed = 2629361877
     seed = int(np.random.rand() * (2**32 - 1))
     np.random.seed(seed)
 
@@ -298,11 +298,23 @@ def run(num_samples, iter = 0):
     u_poly = []
     
     # zrange = tuple(x*0.02 for x in range(-20*50, 20*50+1)) # [-20, 20, step = 0.04]
-    z = -10
-    zmax = 10
+    z = -20
+    ztemp = z 
+    zmax = 20
     while z <= zmax:
         # print(z)
-        z += 0.002
+        if abs(z) > 5:
+            ztemp += 0.5
+        else: 
+            ztemp += 0.001
+
+        if z < etaT_Y and ztemp >= etaT_Y:
+            z = etaT_Y
+            print("Catched")
+            print("Seed: ",seed)
+
+
+        # print(z)
         Ydeltaz = a + b*z
         # if abs(z) >= 10:
         #     z+= 0.5
@@ -328,6 +340,7 @@ def run(num_samples, iter = 0):
         Vm_ = max(Vminus12, Vminus3)
         Vp_ = min(Vplus12, Vplus3)
         if Vm_ > Vp_:
+            z = ztemp
             continue
             print(f"ERROR {Vm_}, {Vp_}")
 
@@ -336,7 +349,10 @@ def run(num_samples, iter = 0):
         # print(z)
         if z < u_poly[-1][1]:
             z = u_poly[-1][1]
-            # print(f"-{z}--")
+            ztemp = z
+            # print(f"Finded: {z}")
+        else:
+            z = ztemp
 
     
     
@@ -359,16 +375,18 @@ def run(num_samples, iter = 0):
     # # compute cdf of truncated gaussian distribution
     # numerator = mp.ncdf(etaT_Y / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(Vminus / np.sqrt(etaT_Sigma_eta))
     # denominator = mp.ncdf(Vplus / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(Vminus / np.sqrt(etaT_Sigma_eta))
+    # if numerator == None:
+    #     print("Seed: ",seed)
+    #     numerator = 0
     cdf = float(numerator / denominator)
 
-    print("Seed: ",seed)
 
     # compute two-sided selective p_value
     selective_p_value = 2 * min(cdf, 1 - cdf)
     return selective_p_value
 if __name__ == "__main__":
-    for i in range(15):
+    for i in range(1):
         st = time.time()
-        print(run(35, 0))
+        print(run(25, 0))
         en = time.time()
         print(f"Time step {i}: {en - st}")
