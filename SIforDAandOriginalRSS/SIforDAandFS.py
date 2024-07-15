@@ -141,8 +141,8 @@ def FSinterval(X, Y_, gamma, SELECTION_F, aa, bb, eta):
     return Vminus, Vplus
 
 def run(num_samples, iterr = 0):
-    true_beta1 = np.array([0, 0, 0, 0]) #source's beta
-    true_beta2 = np.array([0, 0, 0, 0]) #target's beta
+    true_beta1 = np.array([0, 0, 0]) #source's beta
+    true_beta2 = np.array([5, 5, 5]) #target's beta
     # print(num_samples)
     # number of sample
     ns = int(num_samples * 0.8) # source ~ 80%
