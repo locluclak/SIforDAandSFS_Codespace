@@ -141,8 +141,8 @@ def FSinterval(X, Y_, gamma, SELECTION_F, aa, bb, eta):
     return Vminus, Vplus
 
 def run(num_samples, iterr = 0):
-    true_beta1 = np.array([1, 1, 0, 0, 0]) #source's beta
-    true_beta2 = np.array([1, 1, 0, 0, 0]) #target's beta
+    true_beta1 = np.array([4, 4, 4]) #source's beta
+    true_beta2 = np.array([4, 4, 4]) #target's beta
     # print(num_samples)
     # number of sample
     ns = int(num_samples * 0.8) # source ~ 80%
@@ -207,7 +207,7 @@ def run(num_samples, iterr = 0):
     Xtilde = np.dot(gamma, X)
 
     # Select best feature of model
-    SELECTION_F,r = FS.fixedSelection(np.dot(gamma, YsYt), Xtilde, 3)
+    SELECTION_F,r = FS.fixedSelection(np.dot(gamma, YsYt), Xtilde, 2)
 
     # X_M = Xtilde[:, sorted([x for x in range(p) if x not in SELECTION_F])].copy()
     X_M = Xtilde[:, sorted(SELECTION_F)].copy()
