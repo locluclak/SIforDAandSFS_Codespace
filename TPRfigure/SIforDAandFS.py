@@ -141,8 +141,8 @@ def FSinterval(X, Y_, gamma, SELECTION_F, aa, bb, eta):
     return Vminus, Vplus
 
 def run(num_samples, iterr = 0):
-    true_beta1 = np.array([5, 5, 5]) #source's beta
-    true_beta2 = np.array([5, 5, 5]) #target's beta
+    true_beta1 = np.array([1, 1, 0, 0, 0]) #source's beta
+    true_beta2 = np.array([1, 1, 0, 0, 0]) #target's beta
     # print(num_samples)
     # number of sample
     ns = int(num_samples * 0.8) # source ~ 80%
@@ -207,7 +207,7 @@ def run(num_samples, iterr = 0):
     Xtilde = np.dot(gamma, X)
 
     # Select best feature of model
-    SELECTION_F,r = FS.fixedSelection(np.dot(gamma, YsYt), Xtilde, 2)
+    SELECTION_F,r = FS.fixedSelection(np.dot(gamma, YsYt), Xtilde, 3)
 
     # X_M = Xtilde[:, sorted([x for x in range(p) if x not in SELECTION_F])].copy()
     X_M = Xtilde[:, sorted(SELECTION_F)].copy()
@@ -248,13 +248,15 @@ def run(num_samples, iterr = 0):
     # compute cdf of truncated gaussian distribution
     numerator = mp.ncdf(etaT_YsYt / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(Vminus / np.sqrt(etaT_Sigma_eta))
     denominator = mp.ncdf(Vplus / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(Vminus / np.sqrt(etaT_Sigma_eta))
-    cdf = float(numerator / denominator)
-
+    try:
+        cdf = float(numerator / denominator)
+    except:
+        cdf = 0 
     # compute two-sided selective p_value
     selective_p_value = 2 * min(cdf, 1 - cdf)
 
     return selective_p_value
 
 if __name__ == "__main__":
-    for i in range(100):
+    for i in range(5):
         print(run(200,0)) 

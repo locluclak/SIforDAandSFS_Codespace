@@ -5,9 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 def main(st = 0):
-    max_iteration = 1200
+    max_iteration = 120
     list_p_value = []
-    ssize = 150
+    ssize = 200
     alpha = 0.05
     count = 0
     #print("core available: ", mpr.cpu_count())
@@ -21,9 +21,9 @@ def main(st = 0):
         # print(i)
         if i <= alpha:
             count += 1
-
-    # print('False positive rate:', count / max_iteration)
-    print('True positive rate:', 1 - count / max_iteration)
+    print(f"Sample size: {ssize}")
+    print('True positive rate:', count / max_iteration)
+    print('False negative rate:', 1 - count / max_iteration)
     kstest_pvalue = scipy.stats.kstest(list_p_value, 'uniform').pvalue
     print('Uniform Kstest check:', kstest_pvalue)
     # plt.hist(list_p_value)
