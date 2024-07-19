@@ -7,7 +7,7 @@ import os
 def main(st = 0):
     max_iteration = 500
     list_p_value = []
-    ssize = 150
+    ssize = 200
     alpha = 0.05
     count = 0
     #print("core available: ", mpr.cpu_count())
