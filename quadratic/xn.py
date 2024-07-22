@@ -3,43 +3,44 @@ import intersection
 from mpmath import mp
 mp.dps = 500
 
-
-def run(iter = 0):
-    # seed = 2629361877
+def run(ssize = 3):
     try:
         seed = int(np.random.rand() * (2**32 - 1))
+        # seed = 2629361877
         np.random.seed(seed)
 
-        X = np.random.normal(0,1,3).reshape((-1, 1))
+        n = ssize
+        X = np.random.normal(0,1,n).reshape((-1, 1))
         # print("X: ", X)
-        Sigma = np.identity(3)
-        A = [np.zeros((3,3)) for i in range(2)]
+        Sigma = np.identity(n)
+        A = [np.zeros((n,n)) for i in range(n-1)]
 
         maxx= 0
         j=0
-        for i in range(3):
+        for i in range(n):
             if (X[i][0]**2) > maxx:
                 maxx = X[i][0]**2
                 j = i
 
-        eta = np.zeros((3,1))
+        eta = np.zeros((n,1))
         eta[j] = 1
+
         etaT_Sigma_eta = eta.T.dot(Sigma.dot(eta)).item()
         bb = Sigma.dot(eta) / etaT_Sigma_eta 
-        aa = (np.identity(3) - bb.dot(eta.T)).dot(X)  
+        aa = (np.identity(n) - bb.dot(eta.T)).dot(X)  
 
-
-        A[0][j][j] =1
-        A[1][j][j] =1
-        
+        # A[0][j][j] =1
+        # A[1][j][j] =1
+        for i in range(n-1):
+            A[i][j][j] = 1
         ath = 0
-        for i in range(3):
+        for i in range(n):
             if i != j:
                 A[ath][i][i] = -1
                 ath += 1
         ath = 0
         Acons = []
-        for i in range(3):
+        for i in range(n):
             if i != j:
                 rows = []
                 rows.append(-1 * bb.T.dot(A[ath].dot(bb)).item())
@@ -49,12 +50,13 @@ def run(iter = 0):
                 ath += 1
                 Acons.append(np.array(rows).copy())
         Acons = np.array(Acons)
-        intervals = []
+        # print(Acons)
+        intervals = [] 
         for i in Acons:
             a, b, c = i
             intervals.append(intersection.solvequadra(a,b,c))
         intervals = intersection.Intersection(intervals)
-        
+        print(intervals)
         etaT_Y = np.dot(eta.T, X).item()
 
         # Arena of truncate PDF
@@ -74,8 +76,10 @@ def run(iter = 0):
         # compute two-sided selective p_value
         selective_p_value = 2 * min(cdf, 1 - cdf)
         return selective_p_value
+        return 0
     except:
         raise ValueError(seed)
 
 if __name__ == "__main__":
-    print(run())
+    for i in range(1):
+        print(run(30))
