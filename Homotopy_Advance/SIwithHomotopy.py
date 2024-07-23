@@ -9,34 +9,16 @@ from mpmath import mp
 mp.dps = 500
 
 
-def DA_Wasser(ns, nt, X_):
+def DA_Wasser(ns, nt, S_, h_, X_):
     OMEGA = Wasser.createOMEGA(ns,nt).copy()
-
-    #SignYsYt
-    Sign_obs = 0
 
     #Cost vector
     cost = 0
-    cost_ = 0
 
     p = X_.shape[1] - 1 
     for i in range(p+1):
-        Sign = np.sign(np.dot(OMEGA , X_[:, [i]]))
-        cost += Sign * np.dot(OMEGA , X_[:, [i]])
-        #theta YsYt and c''
-        if i == p:
-            Sign_obs = Sign
-            theta = Sign_obs * OMEGA
-        else:
-            #cost''
-            cost_ += Sign * OMEGA.dot(X_[:, [i]])
-    
-    h = np.concatenate((np.ones((ns, 1))/ns, np.ones((nt,1))/nt), axis = 0) 
-    S = Wasser.convert(ns,nt)
-    
-    #remove last row
-    S_ = S[:-1].copy()
-    h_ = h[:-1].copy()
+        cost += abs(np.dot(OMEGA , X_[:, [i]]))
+        
 
     # Solve wasserstein distance
     res = linprog(cost, A_ub = - np.identity(ns * nt), b_ub = np.zeros((ns * nt, 1)), 
@@ -45,9 +27,10 @@ def DA_Wasser(ns, nt, X_):
     # Transport Map
     Tobs = res.x.reshape((ns,nt))
     gamma = Wasser.computeGamma(ns, nt, Tobs)
-    return gamma
+    return {"gamma": gamma, "basis": res.basis}
+    # return gamma 
 
-def interval_DA(ns, nt, X_, aa, bb):
+def interval_DA(ns, nt, X_, res, S_, h_, aa, bb):
     OMEGA = Wasser.createOMEGA(ns,nt).copy()
 
     #SignYsYt
@@ -69,19 +52,8 @@ def interval_DA(ns, nt, X_, aa, bb):
             #cost''
             cost_ += Sign * OMEGA.dot(X_[:, [i]])
     
-    h = np.concatenate((np.ones((ns, 1))/ns, np.ones((nt,1))/nt), axis = 0) 
-    S = Wasser.convert(ns,nt)
-    
-    #remove last row
-    S_ = S[:-1].copy()
-    h_ = h[:-1].copy()
 
-    # Solve wasserstein distance
-    res = linprog(cost, A_ub = - np.identity(ns * nt), b_ub = np.zeros((ns * nt, 1)), 
-                        A_eq = S_, b_eq = h_, method = 'simplex', 
-                        options={'maxiter': 10000})
-
-    basis_var = res.basis
+    basis_var = res
     nonbasis_var = np.delete(np.array(range(ns*nt)), basis_var)
 
     t_Mobs = np.dot(np.linalg.inv(S_[:, basis_var]), h_)
@@ -225,16 +197,18 @@ def unionPoly(listofpoly, Vm, Vp):
     return ls
 
 def run(num_samples, iter = 0):
-    seed = 2629361877
+    seed = 3562088209
     # seed = int(np.random.rand() * (2**32 - 1))
     np.random.seed(seed)
-
+    print(seed)
     true_beta1 = np.array([0, 0, 0]) #source's beta
     true_beta2 = np.array([0, 0, 0]) #target's beta
     # print(num_samples)
     # number of sample
     ns = int(num_samples * 0.8) # source ~ 80%
     nt = num_samples - ns # target ~ 20%
+    # nt = 10# target = 10
+    # ns = num_samples - nt # source ~ 80%
 
     p = len(true_beta1) # number of features
 
@@ -257,8 +231,17 @@ def run(num_samples, iter = 0):
     # Deviation of Y
     Sigma_ = np.identity(ns+nt) 
 
+
+    # Linear program
+    h = np.concatenate((np.ones((ns, 1))/ns, np.ones((nt,1))/nt), axis = 0) 
+    S = Wasser.convert(ns,nt)
+        #remove last row
+    S_ = S[:-1].copy()
+    h_ = h[:-1].copy()
+
+
     # Gamma drives source data to target one 
-    GAMMA = DA_Wasser(ns, nt, XsXt_)
+    GAMMA = DA_Wasser(ns, nt, S_, h_, XsXt_)["gamma"]
 
     # Bunch of Xs Xt after transforming
     Xtilde = np.dot(GAMMA, X)
@@ -297,18 +280,19 @@ def run(num_samples, iter = 0):
     # Vplus = min(Vplus12, Vplus3)
     u_poly = []
     
-    # zrange = tuple(x*0.02 for x in range(-20*50, 20*50+1)) # [-20, 20, step = 0.04]
+    # zrange = tuple(x*0.02 for x in range(-20*50, 20*50+1)) # [-20, 20, step = 0./04]
     z = -20
-    ztemp = z 
+    # ztemp = z 
     zmax = 20
+    # z = etaT_Y - 0.001
+    # ztemp = z
+    # zmax = etaT_Y + 0.001
     while z <= zmax:
         # print(z)
-        if abs(z) > 5:
-            ztemp += 0.5
-        else: 
-            ztemp += 0.001
 
-        if z < etaT_Y and ztemp >= etaT_Y:
+        z += 0.001
+
+        if z < etaT_Y and z - 0.001 >= etaT_Y:
             z = etaT_Y
             print("Catched")
             print("Seed: ",seed)
@@ -320,40 +304,43 @@ def run(num_samples, iter = 0):
         #     z+= 0.5
         # else:
         # print(z)
+
+        
         XsXt_deltaz = np.concatenate((X, Ydeltaz), axis= 1).copy()
-        GAMMAdeltaz = DA_Wasser(ns, nt, XsXt_deltaz)
+        GAMMAdeltaz, res_linprog = DA_Wasser(ns, nt, S_, h_, XsXt_deltaz).values()
 
         # Bunch of Xs Xt after transforming
         Xtildeinloop = np.dot(GAMMAdeltaz, X)
         Ytildeinloop = np.dot(GAMMAdeltaz, Y)
 
         # Select 2 best features of model
-        SELECTION_Finloop, r = FS.fixedSelection(Ytildeinloop, Xtildeinloop, 2)
-        if SELECTION_F != SELECTION_Finloop:
-            continue
-
+        SELECTION_Finloop = FS.fixedSelection(Ytildeinloop, Xtildeinloop, 2)[0]
+        
         # Interval of z1, z2
-        Vminus12, Vplus12 = interval_DA(ns, nt, XsXt_deltaz, a, b)
+        Vminus12, Vplus12 = interval_DA(ns, nt, XsXt_deltaz, res_linprog, S_, h_, a, b)
         # Interval of z3
         Vminus3, Vplus3 = interval_SFS(X, Ydeltaz, GAMMAdeltaz, SELECTION_F, a, b)
-    
+        
+
         Vm_ = max(Vminus12, Vminus3)
         Vp_ = min(Vplus12, Vplus3)
         if Vm_ > Vp_:
-            z = ztemp
+            # z = ztemp
             continue
-            print(f"ERROR {Vm_}, {Vp_}")
+        
+        if z < Vp_:
+            z = Vp_
+            # ztemp = z
+            # print(f"Finded: {z}")
+        # else:
+        #     z = ztemp
 
-        # print("Detected")
+        if SELECTION_F != SELECTION_Finloop:
+            continue
+
         u_poly = unionPoly(u_poly, Vm_, Vp_)
         # print(z)
-        if z < u_poly[-1][1]:
-            z = u_poly[-1][1]
-            ztemp = z
-            # print(f"Finded: {z}")
-        else:
-            z = ztemp
-
+        
     
     
     
@@ -371,10 +358,6 @@ def run(num_samples, iter = 0):
         denominator += mp.ncdf(rightside / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(leftside / np.sqrt(etaT_Sigma_eta))
 
 
-    # etaT_Y = np.dot(eta.T, Y).item()
-    # # compute cdf of truncated gaussian distribution
-    # numerator = mp.ncdf(etaT_Y / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(Vminus / np.sqrt(etaT_Sigma_eta))
-    # denominator = mp.ncdf(Vplus / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(Vminus / np.sqrt(etaT_Sigma_eta))
     # if numerator == None:
     #     print("Seed: ",seed)
     #     numerator = 0
@@ -387,6 +370,6 @@ def run(num_samples, iter = 0):
 if __name__ == "__main__":
     for i in range(1):
         st = time.time()
-        print(run(100, 0))
+        print(run(20, 0))
         en = time.time()
         print(f"Time step {i}: {en - st}")
