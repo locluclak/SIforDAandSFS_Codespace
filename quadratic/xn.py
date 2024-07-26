@@ -56,7 +56,7 @@ def run(ssize = 3):
             a, b, c = i
             intervals.append(intersection.solvequadra(a,b,c))
         intervals = intersection.Intersection(intervals)
-        print(intervals)
+        # print(intervals)
         etaT_Y = np.dot(eta.T, X).item()
 
         # Arena of truncate PDF

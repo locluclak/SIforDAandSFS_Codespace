@@ -12,7 +12,7 @@ def main(st = 0):
     alpha = 0.05
     count = 0
     #print("core available: ", mpr.cpu_count())
-    iter = (20,) * max_iteration
+    iter = (50,) * max_iteration
 
     with mpr.Pool(initializer = np.random.seed) as pool:
         list_p_value = pool.map(xn.run, iter)

@@ -1,4 +1,4 @@
-import SIforDAandFS
+import SIforFS
 import multiprocessing as mpr
 import scipy 
 import numpy as np
@@ -7,14 +7,14 @@ import os
 def main(st = 0):
     max_iteration = 100000
     list_p_value = []
-    ssize = 86
+    ssize = 12
     alpha = 0.05
     count = 0
     #print("core available: ", mpr.cpu_count())
     iter = (ssize,) * max_iteration
 
     with mpr.Pool(initializer = np.random.seed) as pool:
-        list_p_value = pool.map(SIforDAandFS.run, iter)
+        list_p_value = pool.map(SIforFS.run, iter)
     # for i in range(max_iteration):
     #     list_p_value.append(Wasserstein.run())
     for i in list_p_value:
