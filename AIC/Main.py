@@ -5,9 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 def main(st = 0):
-    max_iteration = 100000
+    max_iteration = 80000
     list_p_value = []
-    ssize = 12
+    ssize = 500
     alpha = 0.05
     count = 0
     #print("core available: ", mpr.cpu_count())

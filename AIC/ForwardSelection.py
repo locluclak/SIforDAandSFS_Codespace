@@ -22,9 +22,7 @@ def SelectionAIC(Y,X):
     AIC = np.inf
     n = X.shape[0]
 
-    # fullmodel = np.linalg.inv(X.T @ X) @ X.T @ Y
-
-    sigma2 = 1 / n * np.sum((Y - np.mean(Y))**2) #RSS(Y,X, fullmodel) / X.shape[1]
+    sigma2 = 1 / n * np.sum((Y - np.mean(Y))**2) 
     for i in range(1, X.shape[1] + 1):
         sset, rss = fixedSelection(Y, X, i)
         d = i
@@ -88,7 +86,7 @@ def RSS(Y, X, coef, intercept = 0):
 
 def RSSwithoutcoef(Y, X, intercept = 0):
     RSS = 0
-    coef = np.dot(np.dot(np.linalg.inv(np.dot(X.T, X)), X.T) , Y)
+    coef = np.dot(np.dot(np.linalg.pinv(np.dot(X.T, X)), X.T) , Y)
     RSS = np.linalg.norm(Y - np.dot(X, coef))**2
     # print("RSS:", RSS)
     return RSS        
