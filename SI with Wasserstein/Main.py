@@ -5,7 +5,7 @@ import scipy
 import numpy as np
 import matplotlib.pyplot as plt
 def main(st = 0):
-    max_iteration = 40000
+    max_iteration = 100000
     list_p_value = []
 
     alpha = 0.05

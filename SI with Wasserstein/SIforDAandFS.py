@@ -132,10 +132,10 @@ def FSinterval(X, Y_, gamma, SELECTION_F, aa, bb, eta):
     return Vminus, Vplus
 
 def run(iterr = 0):
-    true_beta1 = np.array([0,0,0,0])
-    true_beta2 = np.array([0,0,0,0])
+    true_beta1 = np.array([0,0])
+    true_beta2 = np.array([0,0])
 
-    ns = 30
+    ns = 20
     nt = 7
 
     p = len(true_beta1)
@@ -278,11 +278,12 @@ def run(iterr = 0):
                 Vplus = min(temp, Vplus)
 
     Vminus3, Vplus3 = FSinterval(XtildeA, YsYt, gamma, SELECTION_F, a, b, eta)
+    print(f"DA: ({Vminus}, {Vplus})")
     Vminus = max(Vminus, Vminus3)
     Vplus = min(Vplus, Vplus3)
-
+    print(f"({Vminus}, {Vplus})")
     etaT_YsYt = np.dot(eta.T, YsYt).item()
-    # print("etaY",etaT_YsYt)
+    print("etaY:",etaT_YsYt)
 
     # compute cdf of truncated gaussian distribution
     numerator = mp.ncdf(etaT_YsYt / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(Vminus / np.sqrt(etaT_Sigma_eta))
@@ -295,5 +296,5 @@ def run(iterr = 0):
     return selective_p_value
 
 if __name__ == "__main__":
-    for i in range(10):
+    for i in range(2):
         print(run()) 

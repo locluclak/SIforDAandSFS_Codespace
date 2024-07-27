@@ -109,7 +109,7 @@ def interval_DA(ns, nt, X_, res, S_, h_, aa, bb):
     return Vminus, Vplus
 
 
-def interval_SFS(X_nontrans, Y_nontrans, gamma, SELECTION_F, aa, bb):
+def interval_SFS(X_nontrans, Y_nontrans, gamma, SELECTION, aa, bb):
     # Xtilde Ytilde
     X = gamma.dot(X_nontrans)
     Y = gamma.dot(Y_nontrans)
@@ -118,16 +118,16 @@ def interval_SFS(X_nontrans, Y_nontrans, gamma, SELECTION_F, aa, bb):
     A=[]
     b=[]
 
-    k = len(SELECTION_F)
+    k = len(SELECTION)
 
     I = np.identity(n_sample)   
 
     for step in range(1, k+1):
         I = np.identity(n_sample)
-        X_Mk_1 = X[:, sorted(SELECTION_F[:step - 1])].copy()
+        X_Mk_1 = X[:, sorted(SELECTION[:step - 1])].copy()
         P_pp_Mk_1 = I - np.dot(np.dot(X_Mk_1, np.linalg.inv(np.dot(X_Mk_1.T, X_Mk_1))), X_Mk_1.T) 
 
-        Xjk = X[:, [SELECTION_F[step-1]]].copy()
+        Xjk = X[:, [SELECTION[step-1]]].copy()
         sign_projk = np.sign(np.dot(Xjk.T , np.dot(P_pp_Mk_1, Y)).item()).copy()
         
         projk = sign_projk*(np.dot(Xjk.T, P_pp_Mk_1)) / np.linalg.norm(P_pp_Mk_1.dot(Xjk))
@@ -136,7 +136,7 @@ def interval_SFS(X_nontrans, Y_nontrans, gamma, SELECTION_F, aa, bb):
             A.append(-1*projk[0].copy())
             b.append(0)
         for otherfea in range(n_fea):
-            if otherfea not in SELECTION_F[:step]:
+            if otherfea not in SELECTION[:step]:
 
                 Xj = X[:, [otherfea]].copy()
                 sign_proj = np.sign(np.dot(Xj.T , np.dot(P_pp_Mk_1, Y)).item()).copy()
@@ -197,10 +197,10 @@ def unionPoly(listofpoly, Vm, Vp):
     return ls
 
 def run(num_samples, iter = 0):
-    seed = 3562088209
-    # seed = int(np.random.rand() * (2**32 - 1))
+    # seed = 3562088209
+    seed = int(np.random.rand() * (2**32 - 1))
     np.random.seed(seed)
-    print(seed)
+    # print(seed)
     true_beta1 = np.array([0, 0, 0]) #source's beta
     true_beta2 = np.array([0, 0, 0]) #target's beta
     # print(num_samples)
@@ -311,7 +311,7 @@ def run(num_samples, iter = 0):
 
         # Bunch of Xs Xt after transforming
         Xtildeinloop = np.dot(GAMMAdeltaz, X)
-        Ytildeinloop = np.dot(GAMMAdeltaz, Y)
+        Ytildeinloop = np.dot(GAMMAdeltaz, Ydeltaz)
 
         # Select 2 best features of model
         SELECTION_Finloop = FS.fixedSelection(Ytildeinloop, Xtildeinloop, 2)[0]
@@ -319,13 +319,18 @@ def run(num_samples, iter = 0):
         # Interval of z1, z2
         Vminus12, Vplus12 = interval_DA(ns, nt, XsXt_deltaz, res_linprog, S_, h_, a, b)
         # Interval of z3
-        Vminus3, Vplus3 = interval_SFS(X, Ydeltaz, GAMMAdeltaz, SELECTION_F, a, b)
+        Vminus3, Vplus3 = interval_SFS(X, Ydeltaz, GAMMAdeltaz, SELECTION_Finloop, a, b)
         
 
         Vm_ = max(Vminus12, Vminus3)
         Vp_ = min(Vplus12, Vplus3)
         if Vm_ > Vp_:
             # z = ztemp
+            print("Error....")
+            print("z:", z)
+            print("In DA", Vminus12, Vplus12)
+            print("In SFS:", Vminus3, Vplus3)
+            return
             continue
         
         if z < Vp_:
@@ -370,6 +375,6 @@ def run(num_samples, iter = 0):
 if __name__ == "__main__":
     for i in range(1):
         st = time.time()
-        print(run(20, 0))
+        print(run(50, 0))
         en = time.time()
         print(f"Time step {i}: {en - st}")
