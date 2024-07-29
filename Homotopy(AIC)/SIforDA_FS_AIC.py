@@ -21,7 +21,6 @@ def DA_Wasser(ns, nt, S_, h_, X_):
     for i in range(p+1):
         cost += abs(np.dot(OMEGA , X_[:, [i]]))
         
-
     # Solve wasserstein distance
     res = linprog(cost, A_ub = - np.identity(ns * nt), b_ub = np.zeros((ns * nt, 1)), 
                         A_eq = S_, b_eq = h_, method = 'simplex', 
@@ -31,20 +30,20 @@ def DA_Wasser(ns, nt, S_, h_, X_):
     gamma = Wasser.computeGamma(ns, nt, Tobs)
     return {"gamma": gamma, "basis": res.basis}
 
-def run(num_samples = 12):
-    # seed = 4245225112
+def run(num_samples = 30):
+    # seed = 3113993449
     seed = int(np.random.rand() * (2**32 - 1))
     np.random.seed(seed)
     print("Seed:",seed)
 
-    true_betaS = np.array([0, 0, 0, 0, 0, 0]) #source's beta
-    true_betaT = np.array([0, 0, 0, 0, 0, 0]) #target's beta
+    true_betaS = np.array([0, 0, 0 ]) #source's beta
+    true_betaT = np.array([0, 0, 0 ]) #target's beta
 
     # number of sample
-    ns = int(num_samples * 0.8) # source ~ 80%
-    nt = num_samples - ns       # target ~ 20%
-    # nt = 10               # target = 10
-    # ns = num_samples - nt # source = n_sample - target
+    # ns = int(num_samples * 0.8) # source ~ 80%
+    # nt = num_samples - ns       # target ~ 20%
+    nt = 10               # target = 10
+    ns = num_samples - nt # source = n_sample - target
 
     p = len(true_betaS) # number of features
 
@@ -74,14 +73,14 @@ def run(num_samples = 12):
     S_ = S[:-1].copy()
     h_ = h[:-1].copy()
     # Gamma drives source data to target data 
-    GAMMA = DA_Wasser(ns, nt, S_, h_, XsXt_)["gamma"]
+    GAMMA,res_linprog = DA_Wasser(ns, nt, S_, h_, XsXt_).values()
 
     # Bunch of Xs Xt after transforming
     Xtilde = np.dot(GAMMA, X)
     Ytilde = np.dot(GAMMA, Y)
 
     # Best model from 1...p models by AIC criterion
-    SELECTION_F = FS.SelectionAIC(Y, X)
+    SELECTION_F = FS.SelectionAIC(Ytilde, Xtilde)
 
     X_M = Xt[:, sorted(SELECTION_F)].copy()
 
@@ -106,13 +105,28 @@ def run(num_samples = 12):
     # Test statistic
     etaT_Y = np.dot(eta.T, Y).item()
 
+    # print(np.dot(np.dot(np.dot(np.linalg.inv(np.dot(X_M.T, X_M)), X_M.T), Zeta), Y))
     # Truncated distribution's intervals
     TD = []
+    detectedinter = []
 
-    z = etaT_Y - 0.001
-    zmax = z + 0.001
+    # print("etay: ",etaT_Y) #-0.3027165070348666
+    # print("OBS: ",SELECTION_F)
+    z =  -20
+    zmax = 20
     while z < zmax:
         z += 0.001
+
+        for i in range(len(detectedinter)):
+            if detectedinter[i][0] <= z <= detectedinter[i][1]:
+                z = detectedinter[i][1] + 0.001
+                detectedinter = detectedinter[i:]
+                # print("Jump", z)
+                break
+        if z > zmax:
+            break
+        print(z)
+
         Ydeltaz = a + b*z
 
         XsXt_deltaz = np.concatenate((X, Ydeltaz), axis= 1).copy()
@@ -123,8 +137,9 @@ def run(num_samples = 12):
         Ytildeinloop = np.dot(GAMMAdeltaz, Ydeltaz)
 
         # Select best feature of model 
-        lst_SELECk, lst_P = SFSinterval.list_residualvec(Xtildeinloop, Ytildeinloop)
         SELECTIONinloop = FS.SelectionAIC(Ytildeinloop, Xtildeinloop)
+        lst_SELECk, lst_P = SFSinterval.list_residualvec(Xtildeinloop, Ytildeinloop)
+
 
         # Interval of z1, z2 DA
         Vminus12, Vplus12 = DAinterval.interval_DA(ns, nt, XsXt_deltaz, res_linprog, S_, h_, a, b)
@@ -136,34 +151,46 @@ def run(num_samples = 12):
         
         Vm_ = max(Vminus12, Vminus3)
         Vp_ = min(Vplus12, Vplus3)
-        print(f"({Vm_}, {Vp_})")
+        # print(f"({Vm_}, {Vp_})")
         quadratic_interval = SFSinterval.AICinterval(Xtildeinloop, Ytildeinloop, 
                                                         lst_P, len(SELECTIONinloop), 
                                                         GAMMAdeltaz.dot(a), GAMMAdeltaz.dot(b))
-        print("Quadra intervals:",quadratic_interval)
-        TD = intersection.Intersec_quad_linear(quadratic_interval, ((Vm_, Vp_),))
-    print(TD)
+        # print("Quadra intervals:",quadratic_interval)
+        intervalinloop = intersection.Intersec_quad_linear(quadratic_interval, ((Vm_, Vp_),))
+        
+        detectedinter = intersection.Union(detectedinter, intervalinloop)
+
+        if sorted(SELECTIONinloop) != sorted(SELECTION_F):
+            # print(f"    Continue {SELECTION_F} {SELECTIONinloop}", end= "  | ")
+            # print(intervalinloop)
+            continue
+        # print(f"    Catch {SELECTION_F} {SELECTIONinloop}")
+
+        # print("interval each z: ", intervalinloop)
+        TD = intersection.Union(TD, intervalinloop)
+    # print(TD)
     # TD = u_poly
 
 
-    # # Arena of truncate PDF
-    # denominator = 0
-    # numerator = None
+    # Arena of truncate PDF
+    denominator = 0
+    numerator = None
 
-    # for i in TD:
-    #     leftside, rightside = i
-    #     if leftside <= etaT_Y <= rightside:
-    #         numerator = denominator + mp.ncdf(etaT_Y / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(leftside / np.sqrt(etaT_Sigma_eta))
-    #     denominator += mp.ncdf(rightside / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(leftside / np.sqrt(etaT_Sigma_eta))
+    for i in TD:
+        leftside, rightside = i
+        if leftside <= etaT_Y <= rightside:
+            numerator = denominator + mp.ncdf(etaT_Y / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(leftside / np.sqrt(etaT_Sigma_eta))
+        denominator += mp.ncdf(rightside / np.sqrt(etaT_Sigma_eta)) - mp.ncdf(leftside / np.sqrt(etaT_Sigma_eta))
 
-    # cdf = float(numerator / denominator)
+    cdf = float(numerator / denominator)
 
-    # # compute two-sided selective p_value
-    # selective_p_value = 2 * min(cdf, 1 - cdf)
-    # return selective_p_value
+    # compute two-sided selective p_value
+    selective_p_value = 2 * min(cdf, 1 - cdf)
+    print("Seed", seed)
+    return selective_p_value
 if __name__ == "__main__":
     for i in range(1):
         st = time.time()
-        print(run(20))
+        print(run(150))
         en = time.time()
         print(f"Time step {i}: {en - st}")

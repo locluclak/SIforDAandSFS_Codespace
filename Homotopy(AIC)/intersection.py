@@ -1,6 +1,5 @@
 import numpy as np
-from bisect import bisect
-
+from bisect import bisect, bisect_left, bisect_right
 class Obj:
     def __init__(self, v, bracket: bool):
         """
@@ -23,6 +22,11 @@ class Obj:
 
 def solvequadra(a, b, c):
     """ ax^2 + bx +c < 0 """
+    if a == 0:
+        if b > 0:
+            return ((-np.inf, -c / b), )
+        else:
+            return ((-c / b, np.inf),)
     delta = b*b - 4*a*c
     if delta < 0:
         if a < 0:
@@ -106,6 +110,32 @@ def Intersec_quad_linear(a: list, e: tuple) -> list:
     for i in range(0, len(Raxis), 2):
         res.append((Raxis[i].value, Raxis[i+1].value))
     return res
+
+def Union(a: list, b: list) -> list:
+    Raxis = []
+    for interval in a:
+        l, r = interval
+        Raxis.append(Obj(l, False))
+        Raxis.append(Obj(r, True))
+    for interval in b:
+        l, r = interval
+        l_ = Obj(l, False)
+        r_ = Obj(r, True)
+        Raxis.insert(bisect_left(Raxis, l_), l_)
+        Raxis.insert(bisect_left(Raxis, r_), r_)
+    
+    finalinterval = []
+    stack = []
+    for obj in Raxis:
+        if obj.ooc == False:
+            stack.append(obj)
+        else:
+            temp = stack.pop()
+            if len(stack) == 0:
+                finalinterval.append((temp.value, obj.value))
+    
+    return finalinterval
+
 if __name__ == "__main__":
     interval1 = ((-98369550.69527487, -0.3366092581332503),)
     interval2 = ((0.3366092581332504, 98369544.42982495),)
