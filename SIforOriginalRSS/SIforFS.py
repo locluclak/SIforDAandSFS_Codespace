@@ -6,62 +6,62 @@ import ForwardSelection as FS
 from mpmath import mp
 mp.dps = 500
 
-def FSinterval(X, Y_, gamma, SELECTION_F, aa, bb, eta):
+def list_residualvec(X, Y) -> list:
+    # Create 1 ... p matrixes which multiplies Y to get "best k feature residual vector"
+    lst_Portho = []
+    lst_SELEC_k = []
+    n = Y.shape[0]
+    for k in range(0, X.shape[1] + 1):
+        selec_k = FS.fixedSelection(Y, X, k)[0]
+        lst_SELEC_k.append(selec_k)
+        X_Mk = X[:, sorted(selec_k)].copy()
+        lst_Portho.append(np.identity(n) - np.dot(np.dot(X_Mk, np.linalg.pinv(np.dot(X_Mk.T, X_Mk))), X_Mk.T))
+    return lst_SELEC_k, lst_Portho
+
+
+def interval_SFS(X, Y, K, lst_SELEC_k, lst_Portho, aa, bb):
     n_sample, n_fea = X.shape
+
     A=[]
-    b_=[]
-
-    Y = np.dot(gamma, Y_)
-
-    k = len(SELECTION_F)
+    b=[]
 
     I = np.identity(n_sample)   
 
-    for step in range(1, k+1):
-        I = np.identity(n_sample)
-        X_Mk_1 = X[:, sorted(SELECTION_F[:step - 1])].copy()
-        P_pp_Mk_1 = I - np.dot(np.dot(X_Mk_1, np.linalg.inv(np.dot(X_Mk_1.T, X_Mk_1))), X_Mk_1.T) 
-
-        Xjk = X[:, [SELECTION_F[step-1]]].copy()
+    for step in range(1, K+1):
+        P_pp_Mk_1 = lst_Portho[step - 1]
+        Xjk = X[:, [lst_SELEC_k[step][-1]]].copy()
         sign_projk = np.sign(np.dot(Xjk.T , np.dot(P_pp_Mk_1, Y)).item()).copy()
         
         projk = sign_projk*(np.dot(Xjk.T, P_pp_Mk_1)) / np.linalg.norm(P_pp_Mk_1.dot(Xjk))
-    
+        # print("Norm:", np.linalg.norm(P_pp_Mk_1.dot(Xjk)))
         if step == 1:
             A.append(-1*projk[0].copy())
-            b_.append(0)
+            b.append(0)
         for otherfea in range(n_fea):
-            if otherfea not in SELECTION_F[:step]:
+            if otherfea not in lst_SELEC_k[step]:
 
                 Xj = X[:, [otherfea]].copy()
                 sign_proj = np.sign(np.dot(Xj.T , np.dot(P_pp_Mk_1, Y)).item()).copy()
                 proj = sign_proj*(np.dot(Xj.T, P_pp_Mk_1)) / np.linalg.norm(P_pp_Mk_1.dot(Xj))
-                # print(f"__{otherfea}: Proj: {proj.dot(Y).item()} RSS: {np.linalg.norm(P_pp_Mj.dot(Y))**2}")
-                # if step == 1:
-                #     A.append(-1*proj[0].copy())
-                #     b_.append(0)
+
                 A.append(-1*(projk-proj)[0].copy())
-                b_.append(0)
+                b.append(0)
                 A.append(-1*(projk+proj)[0].copy())
-                b_.append(0)
+                b.append(0)
+
+
     A = np.array(A)
-    b_ = np.array(b_).reshape((-1,1))
+    b = np.array(b).reshape((-1,1))
 
-    # Deviation of bunch of Y after transforming 
-    # Sigma = gamma.dot(np.identity(n_sample).dot(gamma.T))
-    Sigma = np.identity(n_sample) 
-
-    etaT_Sigma_eta = np.dot(eta.T , np.dot(Sigma, eta)).item()
-
-    Ac = np.dot(A, np.dot(gamma, bb))
-    Az = np.dot(A, np.dot(gamma, aa))
+    Ac = np.dot(A,  bb)
+    Az = np.dot(A,  aa)
 
     Vminus = np.NINF
     Vplus = np.inf
 
-    for j in range(len(b_)):
+    for j in range(len(b)):
         left = Ac[j][0]
-        right = b_[j][0] - Az[j][0]
+        right = b[j][0] - Az[j][0]
 
         if abs(right) < 1e-14:
             right = 0
@@ -79,6 +79,7 @@ def FSinterval(X, Y_, gamma, SELECTION_F, aa, bb, eta):
                 Vminus = max(Vminus, temp)
     return Vminus, Vplus
 
+
 def run(num_samples, iterr = 0):
     true_beta = np.array([0, 0, 0, 0])
     # print(num_samples)
@@ -93,7 +94,7 @@ def run(num_samples, iterr = 0):
 
     # Select best feature of model
     SELECTION_F,r = FS.fixedSelection(Y, X, 2)
-
+    lst_SELECk, lst_P = list_residualvec(X, Y)
     # X_M = Xtilde[:, sorted([x for x in range(p) if x not in SELECTION_F])].copy()
     X_M = X[:, sorted(SELECTION_F)].copy()
 
@@ -122,8 +123,10 @@ def run(num_samples, iterr = 0):
     b = np.dot(Sigma_, eta) / etaT_Sigma_eta
     a = np.dot((I_nplusm - np.dot(b, eta.T)), Y)
 
-    Vminus, Vplus = FSinterval(X, Y, np.identity(n), SELECTION_F, a, b, eta)
-    
+    Vminus, Vplus = interval_SFS(X, Y, 
+                                    len(SELECTION_F),
+                                    lst_SELECk, lst_P,
+                                    a, b)
     #Test statistic:
     etaT_YsYt = np.dot(eta.T, Y).item()
 
