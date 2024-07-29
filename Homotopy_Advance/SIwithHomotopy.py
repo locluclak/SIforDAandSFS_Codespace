@@ -4,6 +4,8 @@ from scipy.optimize import linprog
 import Wasser
 import ForwardSelection as FS
 import time
+import SFSinterval
+import DAinterval
 
 from mpmath import mp
 mp.dps = 500
@@ -30,153 +32,7 @@ def DA_Wasser(ns, nt, S_, h_, X_):
     return {"gamma": gamma, "basis": res.basis}
     # return gamma 
 
-def interval_DA(ns, nt, X_, res, S_, h_, aa, bb):
-    OMEGA = Wasser.createOMEGA(ns,nt).copy()
 
-    #SignYsYt
-    Sign_obs = 0
-
-    #Cost vector
-    cost = 0
-    cost_ = 0
-
-    p = X_.shape[1] - 1 
-    for i in range(p+1):
-        Sign = np.sign(np.dot(OMEGA , X_[:, [i]]))
-        cost += Sign * np.dot(OMEGA , X_[:, [i]])
-        #theta YsYt and c''
-        if i == p:
-            Sign_obs = Sign
-            theta = Sign_obs * OMEGA
-        else:
-            #cost''
-            cost_ += Sign * OMEGA.dot(X_[:, [i]])
-    
-
-    basis_var = res
-    nonbasis_var = np.delete(np.array(range(ns*nt)), basis_var)
-
-    t_Mobs = np.dot(np.linalg.inv(S_[:, basis_var]), h_)
-    theta_Mobs = theta[basis_var,:]
-    
-    v1 = Sign_obs * np.dot(OMEGA, aa)
-    v2 = Sign_obs * np.dot(OMEGA, bb)
-
-    Vminus = np.NINF
-    Vplus = np.Inf
-    for j in range(v1.size):
-        right = -v1[j][0]
-        left = v2[j][0]
-        
-        if abs(right) < 1e-14:
-            right = 0
-        if abs(left) < 1e-14:
-            left = 0
-        
-        if left == 0:
-            if right > 0:
-                print("Error")
-        else:
-            temp = right / left
-            if left > 0:
-                Vminus = max(temp, Vminus)
-            else:
-                Vplus = min(temp, Vplus)
-
-    u = cost_ + np.dot(theta, aa)
-    v = np.dot(theta, bb)
-
-    u_ = (u[nonbasis_var,:].T - np.dot(u[basis_var,:].T , np.dot(np.linalg.inv(S_[:, basis_var]) , S_[:, nonbasis_var]))).T
-    v_ = (v[nonbasis_var,:].T - np.dot(v[basis_var,:].T , np.dot(np.linalg.inv(S_[:, basis_var]) , S_[:, nonbasis_var]))).T
-
-
-    for j in range(u_.size):
-        right = -u_[j][0]
-        left = v_[j][0]
-        if abs(right) < 1e-14:
-            right = 0
-        if abs(left) < 1e-14:
-            left = 0
-        if left == 0:
-            if right > 0:
-                print("Error")
-        else:
-            temp = right / left
-            if left > 0:
-                Vminus = max(temp, Vminus)            
-            else:
-                Vplus = min(temp, Vplus)    
-    return Vminus, Vplus
-
-
-def interval_SFS(X_nontrans, Y_nontrans, gamma, SELECTION, aa, bb):
-    # Xtilde Ytilde
-    X = gamma.dot(X_nontrans)
-    Y = gamma.dot(Y_nontrans)
-
-    n_sample, n_fea = X.shape
-    A=[]
-    b=[]
-
-    k = len(SELECTION)
-
-    I = np.identity(n_sample)   
-
-    for step in range(1, k+1):
-        I = np.identity(n_sample)
-        X_Mk_1 = X[:, sorted(SELECTION[:step - 1])].copy()
-        P_pp_Mk_1 = I - np.dot(np.dot(X_Mk_1, np.linalg.inv(np.dot(X_Mk_1.T, X_Mk_1))), X_Mk_1.T) 
-
-        Xjk = X[:, [SELECTION[step-1]]].copy()
-        sign_projk = np.sign(np.dot(Xjk.T , np.dot(P_pp_Mk_1, Y)).item()).copy()
-        
-        projk = sign_projk*(np.dot(Xjk.T, P_pp_Mk_1)) / np.linalg.norm(P_pp_Mk_1.dot(Xjk))
-    
-        if step == 1:
-            A.append(-1*projk[0].copy())
-            b.append(0)
-        for otherfea in range(n_fea):
-            if otherfea not in SELECTION[:step]:
-
-                Xj = X[:, [otherfea]].copy()
-                sign_proj = np.sign(np.dot(Xj.T , np.dot(P_pp_Mk_1, Y)).item()).copy()
-                proj = sign_proj*(np.dot(Xj.T, P_pp_Mk_1)) / np.linalg.norm(P_pp_Mk_1.dot(Xj))
-                # print(f"__{otherfea}: Proj: {proj.dot(Y).item()} RSS: {np.linalg.norm(P_pp_Mj.dot(Y))**2}")
-                if step == 1:
-                    A.append(-1*proj[0].copy())
-                    b.append(0)
-                A.append(-1*(projk-proj)[0].copy())
-                b.append(0)
-                A.append(-1*(projk+proj)[0].copy())
-                b.append(0)
-    A = np.array(A)
-    b = np.array(b).reshape((-1,1))
-
-    Ac = np.dot(A, np.dot(gamma, bb))
-    Az = np.dot(A, np.dot(gamma, aa))
-
-    Vminus = np.NINF
-    Vplus = np.inf
-
-    for j in range(len(b)):
-        left = Ac[j][0]
-        right = b[j][0] - Az[j][0]
-
-        if abs(right) < 1e-14:
-            right = 0
-        if abs(left) < 1e-14:
-            left = 0
-        
-        if left == 0:
-            if right < 0:
-                print('Error')
-        else:
-            temp = right / left
-            if left > 0: 
-                Vplus = min(Vplus, temp)
-            else:
-                Vminus = max(Vminus, temp)
-    return Vminus, Vplus
 
 def unionPoly(listofpoly, Vm, Vp):
     ls = []
@@ -205,10 +61,10 @@ def run(num_samples, iter = 0):
     true_beta2 = np.array([0, 0, 0]) #target's beta
     # print(num_samples)
     # number of sample
-    ns = int(num_samples * 0.8) # source ~ 80%
-    nt = num_samples - ns # target ~ 20%
-    # nt = 10# target = 10
-    # ns = num_samples - nt # source ~ 80%
+    # ns = int(num_samples * 0.8) # source ~ 80%
+    # nt = num_samples - ns # target ~ 20%
+    nt = 10               # target = 10
+    ns = num_samples - nt # source = num_samples - target
 
     p = len(true_beta1) # number of features
 
@@ -280,32 +136,21 @@ def run(num_samples, iter = 0):
     # Vplus = min(Vplus12, Vplus3)
     u_poly = []
     
-    # zrange = tuple(x*0.02 for x in range(-20*50, 20*50+1)) # [-20, 20, step = 0./04]
-    z = -20
-    # ztemp = z 
-    zmax = 20
-    # z = etaT_Y - 0.001
-    # ztemp = z
-    # zmax = etaT_Y + 0.001
-    while z <= zmax:
-        # print(z)
-
-        z += 0.001
-
-        if z < etaT_Y and z - 0.001 >= etaT_Y:
-            z = etaT_Y
-            print("Catched")
-            print("Seed: ",seed)
-
-
-        # print(z)
-        Ydeltaz = a + b*z
-        # if abs(z) >= 10:
-        #     z+= 0.5
-        # else:
-        # print(z)
 
         
+    
+    
+    z =  -20
+    zmax = 20
+    while z < zmax:
+        z += 0.001
+
+        if z > zmax:
+            break
+        print(z)
+
+        Ydeltaz = a + b*z
+
         XsXt_deltaz = np.concatenate((X, Ydeltaz), axis= 1).copy()
         GAMMAdeltaz, res_linprog = DA_Wasser(ns, nt, S_, h_, XsXt_deltaz).values()
 
@@ -313,42 +158,33 @@ def run(num_samples, iter = 0):
         Xtildeinloop = np.dot(GAMMAdeltaz, X)
         Ytildeinloop = np.dot(GAMMAdeltaz, Ydeltaz)
 
-        # Select 2 best features of model
-        SELECTION_Finloop = FS.fixedSelection(Ytildeinloop, Xtildeinloop, 2)[0]
-        
-        # Interval of z1, z2
-        Vminus12, Vplus12 = interval_DA(ns, nt, XsXt_deltaz, res_linprog, S_, h_, a, b)
-        # Interval of z3
-        Vminus3, Vplus3 = interval_SFS(X, Ydeltaz, GAMMAdeltaz, SELECTION_Finloop, a, b)
-        
+        # Select best feature of model 
+        SELECTIONinloop = FS.fixedSelection(Ytildeinloop, Xtildeinloop, 2)[0]
+        lst_SELECk, lst_P = SFSinterval.list_residualvec(Xtildeinloop, Ytildeinloop)
 
+
+        # Interval of z1, z2 DA
+        Vminus12, Vplus12 = DAinterval.interval_DA(ns, nt, XsXt_deltaz, res_linprog, S_, h_, a, b)
+        # Interval of z3 SFS
+        Vminus3, Vplus3 = SFSinterval.interval_SFS(Xtildeinloop, Ytildeinloop, 
+                                        len(SELECTIONinloop),
+                                        lst_SELECk, lst_P,
+                                        GAMMAdeltaz.dot(a), GAMMAdeltaz.dot(b))
+        
         Vm_ = max(Vminus12, Vminus3)
         Vp_ = min(Vplus12, Vplus3)
-        if Vm_ > Vp_:
-            # z = ztemp
-            print("Error....")
-            print("z:", z)
-            print("In DA", Vminus12, Vplus12)
-            print("In SFS:", Vminus3, Vplus3)
-            return
-            continue
+        # print(f"({Vm_}, {Vp_})")
         
-        if z < Vp_:
+        if Vm_ <= z <= Vp_:
             z = Vp_
-            # ztemp = z
-            # print(f"Finded: {z}")
-        # else:
-        #     z = ztemp
-
-        if SELECTION_F != SELECTION_Finloop:
+        if sorted(SELECTIONinloop) != sorted(SELECTION_F):
+            # print(f"    Continue {SELECTION_F} {SELECTIONinloop}", end= "  | ")
+            # print(intervalinloop)
             continue
+        # print(f"    Catch {SELECTION_F} {SELECTIONinloop}")
 
+        # print("interval each z: ", intervalinloop)
         u_poly = unionPoly(u_poly, Vm_, Vp_)
-        # print(z)
-        
-    
-    
-    
     # Arena of truncate PDF
     denominator = 0
     numerator = None

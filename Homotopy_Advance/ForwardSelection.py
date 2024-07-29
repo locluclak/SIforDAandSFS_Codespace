@@ -10,7 +10,7 @@ def Selection(Y, X):
 
     sigma2 = RSS(Y,X, fullmodel) / X.shape[1]
 
-    for i in range(1, X.shape[1] + 1):
+    for i in range(0, X.shape[1] + 1):
         sset, rss = fixedSelection(Y, X, i)
         d = i
         cp = (rss + 2*d*sigma2) / n
@@ -18,7 +18,20 @@ def Selection(Y, X):
             bset = sset
             Cp = cp
     return bset
+def SelectionAIC(Y,X):
+    AIC = np.inf
+    n = X.shape[0]
 
+    sigma2 = 1 / n * np.sum((Y - np.mean(Y))**2) 
+    for i in range(1, X.shape[1] + 1):
+        sset, rss = fixedSelection(Y, X, i)
+        d = i
+        aic = rss/sigma2 + 2*i
+        # print(aic)
+        if aic < AIC:
+            bset = sset
+            AIC = aic
+    return bset
 def oneSelection(Y,X):
     rest = list(range(X.shape[1]))
     rss = np.inf
@@ -42,7 +55,7 @@ def fixedSelection(Y, X, k):
     #     return oneSelection(Y,X), 0
     selection = []
     rest = list(range(X.shape[1]))
-
+    rss = np.linalg.norm(Y)**2
     #i = 1
     for i in range(1, k+1):
         rss = np.inf
@@ -73,7 +86,7 @@ def RSS(Y, X, coef, intercept = 0):
 
 def RSSwithoutcoef(Y, X, intercept = 0):
     RSS = 0
-    coef = np.dot(np.dot(np.linalg.inv(np.dot(X.T, X)), X.T) , Y)
+    coef = np.dot(np.dot(np.linalg.pinv(np.dot(X.T, X)), X.T) , Y)
     RSS = np.linalg.norm(Y - np.dot(X, coef))**2
     # print("RSS:", RSS)
     return RSS        
