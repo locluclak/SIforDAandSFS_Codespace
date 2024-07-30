@@ -83,7 +83,7 @@ def AICinterval(X, Y, Portho, K, aa, bb,etay):
     n_sample, n_fea = X.shape
 
     O_bset = Portho[K].T.dot(Portho[K])
-    sigma2 = 1 / n_sample * np.sum((Y - np.mean(Y))**2)
+    sigma2 = 1 / (n_sample - n_fea) * np.sum((Y - np.mean(Y))**2)
     A = []
 
     for step in range(1, n_fea + 1):

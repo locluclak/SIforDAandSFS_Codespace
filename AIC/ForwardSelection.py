@@ -20,9 +20,9 @@ def Selection(Y, X):
     return bset
 def SelectionAIC(Y,X):
     AIC = np.inf
-    n = X.shape[0]
+    n, p = X.shape
 
-    sigma2 = 1 / n * np.sum((Y - np.mean(Y))**2) 
+    sigma2 = 1 / (n-p) * np.sum((Y - np.mean(Y))**2) 
     for i in range(1, X.shape[1] + 1):
         sset, rss = fixedSelection(Y, X, i)
         d = i
